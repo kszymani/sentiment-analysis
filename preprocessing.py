@@ -15,9 +15,11 @@ import sys
 def progress(j, count, prefix, size=60):
     x = int(size * j / count)
     print(f"\r{prefix}[{u'█' * x}{('.' * (size - x))}] {j}/{count}", file=sys.stdout, end='')
+    if j == count:
+        print()
 
 
-counter = 0
+counter = 1
 
 
 def preprocess(data):

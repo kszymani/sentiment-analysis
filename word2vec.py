@@ -9,11 +9,10 @@ def train_word2vec(data):
     print("\nTraining word2vec model...")
     w2v = Word2Vec(sentences=data, min_count=3, vector_size=VECTOR_SIZE)
     w2v.wv.save_word2vec_format(w2v_path, binary=False)
-    w2v = KeyedVectors.load_word2vec_format(w2v_path)
-    print(f'{w2v.most_similar("horrible")=}')
-    print(f'{w2v.most_similar("galaxy")=}')
-    print(f'{w2v.most_similar_cosmul(positive=["woman", "king"], negative=["man"])=}')
-    print(f'{w2v.doesnt_match("woman king queen movie".split())=}')
+    print(f'{w2v.wv.most_similar("horrible")=}')
+    print(f'{w2v.wv.most_similar("movie")=}')
+    print(f'{w2v.wv.most_similar_cosmul(positive=["woman", "king"], negative=["man"])=}')
+    print(f'{w2v.wv.doesnt_match("woman king queen movie".split())=}')
 
 
 def get_w2v(data):

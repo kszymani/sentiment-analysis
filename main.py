@@ -8,35 +8,34 @@ from keras.callbacks import EarlyStopping
 from keras.layers import Bidirectional
 from matplotlib import pyplot as plt
 from pretty_confusion_matrix import pp_matrix_from_data
+from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import Sequential
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
-from tensorflow.keras.layers import LSTM, Dropout, Dense, Embedding
+from tensorflow.keras.layers import LSTM, Dropout, Dense, Embedding, Conv1D, Flatten
 from tensorflow.keras.metrics import Precision, Recall
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import urllib.request
+from tensorflow.keras.backend import binary_crossentropy
 
 from plot_progress import PlotProgress, save_training_info
 from preprocessing import preprocess
 from word2vec import get_w2v
+
+import warnings
+
+warnings.filterwarnings('ignore')
 
 imdb_url = 'https://github.com/SK7here/Movie-Review-Sentiment-Analysis/raw/master/IMDB-Dataset.csv'
 imdb_file = 'IMDB Dataset.csv'
 
 
 def vectorize_data(data, vocab):
-    print('Vectorize sentences...', end='\r')
+    print('Vectorize sentences...')
     keys = list(vocab.keys())
-
-    def filter_unknown(word):
-        return vocab.get(word, None) is not None
-
-    def encode(review):
-        list(map(keys.index, filter(filter_unknown, review)))
-
-    vectorized = list(map(encode, data))
+    vectorized = [[keys.index(word) for word in review if word in vocab] for review in data]
     print('Vectorize sentences... (done)')
     return vectorized
 
@@ -55,7 +54,9 @@ def get_embedding(input_length, w2v):
 def get_model(embed):
     model = Sequential()
     model.add(embed)
-    model.add(Bidirectional(LSTM(128, recurrent_dropout=0.1)))
+    model.add(Bidirectional(LSTM(128, recurrent_dropout=0.1, return_sequences=True)))
+    model.add(Conv1D(64, 3))
+    model.add(Flatten())
     model.add(Dropout(0.25))
     model.add(Dense(64))
     model.add(Dropout(0.3))
@@ -85,11 +86,13 @@ def main():
     X = preprocess(imdb_data['review'])
     Y = imdb_data['sentiment'].values.tolist()
     w2v = get_w2v(X)
+
     X_pad = pad_sequences(
         sequences=vectorize_data(X, vocab=w2v.key_to_index),
         maxlen=input_length,
         padding='post')
-
+    X_pad = np.array(X_pad).astype(np.float32)
+    Y = np.array(list(map(lambda x: 1 if x == 'positive' else 0, Y))).astype(np.float32)
     X_train, X_test, y_train, y_test = train_test_split(
         X_pad,
         Y,
@@ -107,7 +110,7 @@ def main():
     model = get_model(get_embedding(input_length, w2v))
 
     model.compile(
-        loss="binary_crossentropy",
+        loss=binary_crossentropy,
         optimizer=Adam(learning_rate=3e-4),
         metrics=['accuracy', Precision(), Recall()],
     )
@@ -139,7 +142,7 @@ def test(model, X, Y):
     cr = classification_report(Y, Y_pred, target_names=['negative', 'positive'])
     with open(join(testing_path, "classification_scores.txt"), 'w') as f:
         print(cr, file=f)
-    return accuracy_score(actual_classes, predicted_classes)
+    return accuracy_score(Y, Y_pred)
 
 
 if __name__ == '__main__':
