@@ -5,7 +5,7 @@ from os.path import join
 import numpy as np
 import pandas as pd
 from keras.callbacks import EarlyStopping
-from keras.layers import Bidirectional
+from keras.layers import Bidirectional, MaxPooling1D
 from matplotlib import pyplot as plt
 from pretty_confusion_matrix import pp_matrix_from_data
 from sklearn.metrics import classification_report, accuracy_score
@@ -31,50 +31,7 @@ warnings.filterwarnings('ignore')
 imdb_url = 'https://github.com/SK7here/Movie-Review-Sentiment-Analysis/raw/master/IMDB-Dataset.csv'
 imdb_file = 'IMDB Dataset.csv'
 
-
-def vectorize_data(data, vocab):
-    print('Vectorize sentences...')
-    keys = list(vocab.keys())
-    vectorized = [[keys.index(word) for word in review if word in vocab] for review in data]
-    print('Vectorize sentences... (done)')
-    return vectorized
-
-
-def get_embedding(input_length, w2v):
-    embedding_matrix = w2v.vectors
-    return Embedding(
-        input_dim=embedding_matrix.shape[0],
-        output_dim=embedding_matrix.shape[1],
-        input_length=input_length,
-        weights=[embedding_matrix],
-        trainable=False
-    )
-
-
-def get_model(embed):
-    model = Sequential()
-    model.add(embed)
-    model.add(Bidirectional(LSTM(128, recurrent_dropout=0.1, return_sequences=True)))
-    model.add(Conv1D(64, 3))
-    model.add(Flatten())
-    model.add(Dropout(0.25))
-    model.add(Dense(64))
-    model.add(Dropout(0.3))
-    model.add(Dense(1, activation='sigmoid'))
-    model.summary()
-    return model
-
-
-def callbacks():
-    return [
-        ModelCheckpoint(filepath='checkpoint.h5',
-                        save_freq='epoch', verbose=0, monitor='val_accuracy',
-                        save_weights_only=True, save_best_only=True),
-        EarlyStopping(monitor="val_loss", verbose=1, patience=10, restore_best_weights=True),
-        # LearningRateScheduler(scheduler),
-        ReduceLROnPlateau(monitor="val_loss", factor=np.sqrt(0.1), patience=5, verbose=1, min_lr=0.5e-6),
-        PlotProgress('./training_info'),
-    ]
+model_type = 'lstm-cnn'
 
 
 def main():
@@ -98,7 +55,7 @@ def main():
         Y,
         test_size=0.2,
         shuffle=True,
-        random_state=69)
+        random_state=42)
 
     X_train, X_val, y_train, y_val = train_test_split(
         X_train,
@@ -107,12 +64,14 @@ def main():
         shuffle=True,
         random_state=69)
 
-    model = get_model(get_embedding(input_length, w2v))
+    embed = get_embedding(input_length, w2v)
+    if model_type == 'lstm-cnn':
+        model = get_model_lstm_cnn(embed)
+    else:
+        model = get_model_cnn_lstm(embed)
 
     model.compile(
-        loss=binary_crossentropy,
-        optimizer=Adam(learning_rate=3e-4),
-        metrics=['accuracy', Precision(), Recall()],
+        **compile_opts()
     )
     history = model.fit(
         x=X_train,
@@ -143,6 +102,70 @@ def test(model, X, Y):
     with open(join(testing_path, "classification_scores.txt"), 'w') as f:
         print(cr, file=f)
     return accuracy_score(Y, Y_pred)
+
+
+def vectorize_data(data, vocab):
+    print('Vectorize sentences...')
+    keys = list(vocab.keys())
+    vectorized = [[keys.index(word) for word in review if word in vocab] for review in data]
+    print('Vectorize sentences... (done)')
+    return vectorized
+
+
+def get_embedding(input_length, w2v):
+    embedding_matrix = w2v.vectors
+    return Embedding(
+        input_dim=embedding_matrix.shape[0],
+        output_dim=embedding_matrix.shape[1],
+        input_length=input_length,
+        weights=[embedding_matrix],
+        trainable=False
+    )
+
+
+def get_model_lstm_cnn(embed):
+    model = Sequential()
+    model.add(embed)
+    model.add(Bidirectional(LSTM(100, recurrent_dropout=0.1, return_sequences=True)))
+    model.add(Conv1D(32, 3, padding='same', activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Flatten())
+    model.add(Dropout(0.2))
+    model.add(Dense(1, activation='sigmoid'))
+    model.summary()
+    return model
+
+
+def get_model_cnn_lstm(embed):
+    model = Sequential()
+    model.add(embed)
+    model.add(Conv1D(filters=32, kernel_size=3, padding='same', activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Bidirectional(LSTM(100, recurrent_dropout=0.1)))
+    model.add(Dropout(0.2))
+    model.add(Dense(1, activation='sigmoid'))
+    model.summary()
+    return model
+
+
+def callbacks():
+    return [
+        ModelCheckpoint(filepath='checkpoint.h5',
+                        save_freq='epoch', verbose=0, monitor='val_accuracy',
+                        save_weights_only=True, save_best_only=True),
+        EarlyStopping(monitor="val_loss", verbose=1, patience=10, restore_best_weights=True),
+        # LearningRateScheduler(scheduler),
+        ReduceLROnPlateau(monitor="val_loss", factor=np.sqrt(0.1), patience=5, verbose=1, min_lr=0.5e-6),
+        PlotProgress('./training_info'),
+    ]
+
+
+def compile_opts():
+    return {
+        'loss': binary_crossentropy,
+        'optimizer': Adam(learning_rate=3e-4),
+        'metrics': ['accuracy', Precision(), Recall()]
+    }
 
 
 if __name__ == '__main__':
