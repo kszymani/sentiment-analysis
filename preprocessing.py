@@ -20,6 +20,8 @@ stop_words = set(stopwords.words('english'))
 def preprocess(data):
     total = len(data)
     data = list(map(lambda x: clean(x, total), data))
+    global processed_reviews_counter
+    processed_reviews_counter = 1
     return data
 
 
