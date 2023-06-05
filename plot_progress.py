@@ -88,7 +88,7 @@ class PlotProgress(Callback):
                     ax.set_ylim([0.0, 1.0])
                 elif metric == 'loss':
                     ax.set_title(loss_msg)
-                    ax.set_ylim([0.0, 3.0])
+                    ax.set_ylim([0.0, 1.5])
             if self.first_epoch:
                 ax.legend()
                 ax.grid()

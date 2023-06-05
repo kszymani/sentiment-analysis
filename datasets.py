@@ -1,5 +1,4 @@
 import os
-import pathlib
 import re
 
 import numpy as np
@@ -8,29 +7,22 @@ from keras.layers import Embedding
 from keras_preprocessing.sequence import pad_sequences
 from sklearn.model_selection import train_test_split
 from preprocessing import preprocess
-from word2vec import get_w2v
 
 imdb_file = 'datasets/IMDB_Dataset.csv'
 twitter_train_file = 'datasets/twitter_training.csv'
 twitter_test_file = 'datasets/twitter_validation.csv'
 multi_domain = 'datasets/multi-domain'
 
-INPUT_LENGTH = 150
-embeds_dir = 'embeds'
-
+INPUT_LENGTH = 100
 
 def get_data(ds):
-    pathlib.Path(embeds_dir).mkdir(exist_ok=True)
     if ds == imdb_file:
         imdb_data = pd.read_csv(ds)
         X = preprocess(imdb_data['review'])
         Y = imdb_data['sentiment'].values.tolist()
-        w2v = get_w2v(X, name=f'{embeds_dir}/imdb_w2v')
-        X_pad = pad(X, w2v)
         Y = binarize_sentiment(Y)
-        X_train, X_test, y_train, y_test = train_test_split(X_pad, Y, test_size=0.2, shuffle=True, random_state=42)
-        embed = get_embedding(w2v)
-        return (X_train, y_train), (X_test, y_test), embed
+        X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, shuffle=True, random_state=42)
+        return (X_train, y_train), (X_test, y_test)
 
     if ds == twitter_train_file:
         train_data_df = pd.read_csv(twitter_train_file)
@@ -49,26 +41,20 @@ def get_data(ds):
 
         X_train = preprocess(train_data_df['Tweet content'])
         X_test = preprocess(test_data_df['Tweet content'])
-
-        X_all = X_train + X_test
-        w2v = get_w2v(X_all, name=f'{embeds_dir}/twitter_w2v')
         y_train = binarize_sentiment(train_data_df['sentiment'].values.tolist())
         y_test = binarize_sentiment(test_data_df['sentiment'].values.tolist())
 
-        X_train = pad(X_train, w2v)
-        X_test = pad(X_test, w2v)
-        embed = get_embedding(w2v)
-        return (X_train, y_train), (X_test, y_test), embed
+        X = np.concatenate([X_train, X_test])
+        y = np.concatenate([y_train, y_test])
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True, random_state=42)
+        return (X_train, y_train), (X_test, y_test)
 
     if ds == multi_domain:
         X, y = parse_multi_domain()
         X = preprocess(X)
         y = np.array(y).astype(np.float32)
-        w2v = get_w2v(X, name=f'{embeds_dir}/multi_w2v')
-        X_pad = pad(X, w2v)
-        X_train, X_test, y_train, y_test = train_test_split(X_pad, y, test_size=0.2, shuffle=True, random_state=42)
-        embed = get_embedding(w2v)
-        return (X_train, y_train), (X_test, y_test), embed
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True, random_state=42)
+        return (X_train, y_train), (X_test, y_test)
 
 
 def parse_multi_domain():
@@ -107,10 +93,10 @@ def filter_invalid_sentiment(df):
 
 
 def vectorize_data(data, vocab):
-    print('Vectorize sentences...')
+    print(f'Vectorize sentences... ({len(data)})')
     keys = list(vocab.keys())
     vectorized = [[keys.index(word) for word in review if word in vocab] for review in data]
-    print('Vectorize sentences... (done)')
+    print('Done')
     return vectorized
 
 

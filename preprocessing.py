@@ -1,5 +1,6 @@
 import re
 import nltk
+import numpy as np
 
 nltk.download('stopwords')
 nltk.download('punkt')
@@ -19,7 +20,7 @@ stop_words = set(stopwords.words('english'))
 
 def preprocess(data):
     total = len(data)
-    data = list(map(lambda x: clean(x, total), data))
+    data = np.array(list(map(lambda x: clean(x, total), data)))
     global processed_reviews_counter
     processed_reviews_counter = 1
     return data
