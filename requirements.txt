@@ -11,3 +11,5 @@ nltk~=3.8.1
 beautifulsoup4~=4.12.2
 scipy~=1.10.0
 tabulate~=0.8.10
+visualkeras~=0.0.2
+pillow~=9.5.0
